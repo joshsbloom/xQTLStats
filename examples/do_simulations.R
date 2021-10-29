@@ -2,7 +2,6 @@ library(xQTLStats)
 data(crosses.to.parents)
 
 gmaps=readRDS(system.file('reference', 'yeast_gmaps.RDS', package='xQTLStats'))
-
 #reference vcf
 ref.vcf=system.file('reference', 'parents_w_svar_sorted.vcf.gz', package='xQTLStats')
 
@@ -13,99 +12,89 @@ ref.vcf=system.file('reference', 'parents_w_svar_sorted.vcf.gz', package='xQTLSt
 
 #yeast genome chromosome names sorted
 #
-
 #p1.name='YPS163a' #'BYa'
 #p2.name='YJM145x' #'RMx'
-sample.size=2.5e5 #.5e5 #2.5e5 #2.5e5
+sample.size=5e4 #2.5e5 #.5e5 #2.5e5 #2.5e5
 
 cross='B'
 #for(cross in names(crosses.to.parents)){
     p1.name=crosses.to.parents[[cross]][1]
     p2.name=crosses.to.parents[[cross]][2]
    
-    vcf.cross=getCrossVCF(ref.vcf,p1.name, p2.name)
+vcf.cross=getCrossVCF(ref.vcf,p1.name, p2.name)
     #  saveRDS(vcf.cross, file = paste0('/data/xQTL/', cross, '_vcf.RDS')) 
 
     #simulation bit ----------------------------------------------------------
     #    geno.matrix=simHaploidSegsFN(vcf.cross, gmaps[[cross]], sample.size, ngenerations=24)
-    geno.matrix=simHaploidSegsFN(vcf.cross, gmaps[[cross]], sample.size, ngenerations=2)
+geno.matrix=simHaploidSegsFN(vcf.cross, gmaps[[cross]], sample.size, ngenerations=2)
 
     #saveRDS(geno.matrix, file = paste0('/data/xQTL/', cross, '_250K_24.RDS')) 
 #}
     #'/data/xQTL/B_48.RDS')
-
-
 y=simPhenotypesForRefPop(geno.matrix, h2=.4, nQTL=40)
-tf=tempfile()
-expected=simXQTLExperiment(y, geno.matrix, vcf.cross, sel.low=0.1, sel.high=0.1,depth.low=100, depth.high=100, vcf.out=tf)
-low.tail.expected=expected$low.tail.expected; high.tail.expected=expected$high.tail.expected
 
-#------------------------------------------------------------------------
-experiment.vcf=vcfR::read.vcfR(tf) #'/data/xQTL/sim.vcf.gz')
+xqtl_reps=list()
 
-#experiment names (should match col in vcf)
-low.tail.name='low.tail.sim'
-high.tail.name='high.tail.sim'
+for(i in 1:3){
+    tf=tempfile()
+    expected=simXQTLExperiment(y, geno.matrix, vcf.cross, sel.low=0.1, sel.high=0.1,depth.low=100, depth.high=100, vcf.out=tf)
+    low.tail.expected=expected$low.tail.expected; high.tail.expected=expected$high.tail.expected
 
+    #------------------------------------------------------------------------
+    experiment.vcf=vcfR::read.vcfR(tf) #'/data/xQTL/sim.vcf.gz')
 
-low.tail=getBiallelicCounts(experiment.vcf, low.tail.name)
-high.tail=getBiallelicCounts(experiment.vcf, high.tail.name)
+    #experiment names (should match col in vcf)
+    low.tail.name='low.tail.sim'
+    high.tail.name='high.tail.sim'
+
+    low.tail=getBiallelicCounts(experiment.vcf, low.tail.name)
+    high.tail=getBiallelicCounts(experiment.vcf, high.tail.name)
 
     low.tail$expected=low.tail.expected[low.tail$ID]
     high.tail$expected=high.tail.expected[high.tail$ID]
 
 
-#get simulated high tail
-sel.low=0.1
-sel.high=0.1
+    #get simulated high tail
+    sel.low  = 0.1
+    sel.high = 0.1
 
-#phase everything 
-low.tail  = phaseCounts(vcf.cross, p1.name, low.tail)
-high.tail = phaseCounts(vcf.cross, p1.name, high.tail)
-
-#----------------------------------------------------------------------------
-
-#chrom=data.table::tstrsplit(rownames(geno.matrix), '_')[[1]]
-#chrom=factor(chrom, levels=uchr)
-#physical.position=data.table::tstrsplit(rownames(geno.matrix), '_', type.convert=T)[[2]]
-
-chrom=data.table::tstrsplit(high.tail$ID, '_')[[1]]
-uchr=paste0('chr', as.roman(1:16))
-chrom=factor(chrom, levels=uchr)
-physical.position=data.table::tstrsplit(high.tail$ID, '_', type.convert=T)[[2]]
-genetic.position=stack(jitterGmapVector(getGmapPositions(vcf.cross, gmaps[['B']], uchr)))$values
-
-results.data=data.frame(chrom=chrom, 
-                        physical.position=physical.position,
-                        genetic.postion=genetic.position,
-                        expected.af.high=high.tail$expected.phased,
-                        expected.af.low=low.tail$expected.phased,
-                        p1.high=high.tail$p1,
-                        p2.high=high.tail$p2,
-                        p1.low=low.tail$p1,
-                        p2.low=low.tail$p2)
-
-sampleN=getSampleSizes(results.data, sample.size, sel.high, sel.low, eff.length=600)
-
-library('magrittr')
-
-results.data=results.data %>% 
-    dplyr::group_by(chrom) %>%
-    dplyr::group_map(~dplyr::mutate(., 
-       afd.high=doBlockLoess(.x$p1.high, .x$p2.high,.x$physical.position), 
-        afd.low=doBlockLoess(.x$p1.low,  .x$p2.low, .x$physical.position)), 
-              .keep=T) %>% dplyr::bind_rows() %>%
-    dplyr::mutate( afd.high.se=sqrt((afd.high*(1-afd.high))/sampleN$n.high),
-            afd.low.se =sqrt((afd.low *(1-afd.low))/sampleN$n.low)   )%>%
-    dplyr::mutate( afd.contrast=afd.high-afd.low, 
-            afd.contrast.se=sqrt(afd.high.se^2+afd.low.se^2)   )%>% 
-    dplyr::mutate( afd.contrast.z=afd.contrast/ afd.contrast.se ) %>%
-    dplyr::mutate( afd.contrast.p= 2*pnorm(abs(afd.contrast.z), lower.tail=F) ) %>% 
-    dplyr::mutate( afd.contrast.LOD=PvalToLOD(afd.contrast.p)) %>%  suppressWarnings()
+    #phase everything 
+    low.tail  = phaseCounts(vcf.cross, p1.name, low.tail)
+    high.tail = phaseCounts(vcf.cross, p1.name, high.tail)
 
 
-simulatedQTL=data.frame(chrom=chrom[abs(attr(y,"add.qtl"))], 
-                    physical.position=physical.position[abs(attr(y,"add.qtl"))])
+    #----------------------------------------------------------------------------
+    low.tail  = calcAFD(low.tail, experiment.name=paste0('low',i),sample.size=sample.size, sel.strength=sel.low)
+    high.tail = calcAFD(high.tail, experiment.name=paste0('high',i),sample.size=sample.size, sel.strength=sel.high)
+
+    xqtl_reps[[as.character(i)]]$low.tail=low.tail
+    xqtl_reps[[as.character(i)]]$high.tail=high.tail
+}
+
+
+results=list(xqtl_reps[[1]]$low.tail, xqtl_reps[[2]]$low.tail, xqtl_reps[[3]]$low.tail)
+results.low=calcMetaAFD(results, meta_name='meta_low')
+results=list(xqtl_reps[[1]]$high.tail, xqtl_reps[[2]]$high.tail, xqtl_reps[[3]]$high.tail)
+results.high=calcMetaAFD(results, meta_name='meta_high')
+
+results=calcContrastStats(list(results.high, results.low), L='meta_high', R='meta_low')
+
+
+simulatedQTL=data.frame(chrom=results$chrom[abs(attr(y,"add.qtl"))], 
+                    physical.position=results$physical.position[abs(attr(y,"add.qtl"))])
+
+
+
+
+
+h1=plotIndividualExperiment(results, 'high1',simulatedQTL)
+l1=plotIndividualExperiment(results, 'low1',simulatedQTL)
+c1=plotContrast(results, 'high1', 'low1',simulatedQTL)
+
+ggpubr::ggarrange(h1, l1, c1, nrow=3) 
+
+x11()
+plotSummary(results, simulatedQTL)
 
 library(ggplot2)
 high.plot= 
@@ -153,6 +142,76 @@ neglogp.plot=ggplot(results.data, aes(x=physical.position, y=-log10(afd.contrast
         theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1))+ggtitle('-log10(p)')
 
  ggpubr::ggarrange(high.plot, low.plot, contrast.plot, neglogp.plot, nrow=4) 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#chrom=data.table::tstrsplit(rownames(geno.matrix), '_')[[1]]
+#chrom=factor(chrom, levels=uchr)
+#physical.position=data.table::tstrsplit(rownames(geno.matrix), '_', type.convert=T)[[2]]
+
+chrom=data.table::tstrsplit(high.tail$ID, '_')[[1]]
+uchr=paste0('chr', as.roman(1:16))
+chrom=factor(chrom, levels=uchr)
+physical.position=data.table::tstrsplit(high.tail$ID, '_', type.convert=T)[[2]]
+genetic.position=stack(jitterGmapVector(getGmapPositions(vcf.cross, gmaps[['B']], uchr)))$values
+
+results.data=data.frame(chrom=chrom, 
+                        physical.position=physical.position,
+                        genetic.postion=genetic.position,
+                        expected.af.high=high.tail$expected.phased,
+                        expected.af.low=low.tail$expected.phased,
+                        p1.high=high.tail$p1,
+                        p2.high=high.tail$p2,
+                        p1.low=low.tail$p1,
+                        p2.low=low.tail$p2)
+
+sampleN=getSampleSizes(results.data, sample.size, sel.high, sel.low, eff.length=600)
+
+library('magrittr')
+
+results.data=results.data %>% 
+    dplyr::group_by(chrom) %>%
+    dplyr::group_map(~dplyr::mutate(., 
+       afd.high=doBlockLoess(.x$p1.high, .x$p2.high,.x$physical.position), 
+        afd.low=doBlockLoess(.x$p1.low,  .x$p2.low, .x$physical.position)), 
+              .keep=T) %>% dplyr::bind_rows() %>%
+    dplyr::mutate( afd.high.se=sqrt((afd.high*(1-afd.high))/sampleN$n.high),
+            afd.low.se =sqrt((afd.low *(1-afd.low))/sampleN$n.low)   )%>%
+    dplyr::mutate( afd.contrast=afd.high-afd.low, 
+            afd.contrast.se=sqrt(afd.high.se^2+afd.low.se^2)   )%>% 
+    dplyr::mutate( afd.contrast.z=afd.contrast/ afd.contrast.se ) %>%
+    dplyr::mutate( afd.contrast.p= 2*pnorm(abs(afd.contrast.z), lower.tail=F) ) %>% 
+    dplyr::mutate( afd.contrast.LOD=PvalToLOD(afd.contrast.p)) %>%  suppressWarnings()
+
+
 
 
  #   test=vcfR::masplit(eg.AD, record=1)

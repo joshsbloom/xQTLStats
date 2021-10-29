@@ -110,7 +110,6 @@ getIDSorted=function(vcf.cross, uchr){
 #' @return XSnpMatrix snpStats matrix object of 0/1 (relative to reference) coded genotypes of progeny 
 #' @export
 #' @import snpStats
-#' @importFrom Meiosis create_xoparam cross_geno
 simHaploidSegsFN=function(vcf.cross, gmap, nsegs, uchr=paste0('chr', as.roman(1:16)), ngenerations=2 ) {
  
     eg.GT=vcfR::extract.gt(vcf.cross)
@@ -317,7 +316,7 @@ getBiallelicCounts=function(experiment.vcf, exp.name, uchr=paste0('chr', as.roma
 #'
 #' @param vcf.cross vcfR object for the biallelic variants segregating for a given cross 
 #' @param p1.name name of parent to be designated parent 1 in vcf.cross (name must exist in vcf.cross) 
-#' @param df data.frame output from getBiallelicCounts() [ID (marker name), ref (count), alt (count)]
+#' @param df data.frame output from getBiallelicCounts() should contain the columns: ID,ref,alt
 #' @param uchr vector of chromosome names in sorted desired order (optional)
 #' @return data.frame of variant ID, ref count, and alt count phased  
 #' @export

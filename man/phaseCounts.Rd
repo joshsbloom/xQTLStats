@@ -11,7 +11,7 @@ phaseCounts(vcf.cross, p1.name, df, uchr = paste0("chr", as.roman(1:16)))
 
 \item{p1.name}{name of parent to be designated parent 1 in vcf.cross (name must exist in vcf.cross)}
 
-\item{df}{data.frame output from getBiallelicCounts() \link{ID (marker name), ref (count), alt (count)}}
+\item{df}{data.frame output from getBiallelicCounts() should contain the columns: ID,ref,alt}
 
 \item{uchr}{vector of chromosome names in sorted desired order (optional)}
 }

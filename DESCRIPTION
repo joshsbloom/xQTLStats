@@ -14,7 +14,7 @@ LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1
 Depends:
-    R(>= 3.5)
+    R(>= 3.4)
 biocViews:
 Imports:
     usethis,
@@ -22,7 +22,12 @@ Imports:
     Rfast,
     snpStats,
     vcfR,
-    magrittr
+    magrittr,
+    dplyr,
+    purrr,
+    ggplot2,
+    ggpubr,
+    rlang
 Suggests:
     Meiosis,
     devtools,

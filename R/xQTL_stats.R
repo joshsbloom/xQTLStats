@@ -184,45 +184,212 @@ getMeff_Li_and_Ji=function(cor.mat) {
 #Lg=sum(sapply(gmaps[['A']], function(x) max(x$map)))
 #eff.tests=calcEffectiveNumberOfTests()
 
-
-#' Esimate sample sizes either given total pop (unselected) sample size and selection strengths
-#' or effective depths if sample size is constrained by sequencing depth
-#'
-#' @param results.data data frame of results
-#' @param sample.size size of unselected population
-#' @param sel.high fraction of population in high tail
-#' @param sel.low fraction of population in low tail
-#' @param eff.length (default=600) effective number of tests across the genome
-#' @return list of effective sample size estimates
-#' @export 
-getSampleSizes=function(results.data, sample.size, sel.high, sel.low, eff.length=600) {
-    #get sample size based on 
-    n1=sample.size*sel.high
-    n2=sample.size*sel.low
-    
-    effective.sample.n.low=n2
-    effective.sample.n.high=n1
-
-    effective.sample.n.two.tailed=1/((n1+n2)/(n1*n2))
+#' Calculate allele frequency differences by block loess regression 
+#' 
+#' @param phasedCounts data frame with columns ID, p1, p2, which are marker ID, counts for parent 1 and counts for parent 2
+#' @param experiment.name column name in vcf for experiment of interest
+#' @param sample.size sample size of unselected population
+#' @param sel.strength fraction of population selected
+#' @param bin.width collapse counts to bins every 500bp (default) or user specificied physical marker positions (optional)
+#' @param eff.length effective number of indepedent tests across the genome  
+#' @param gmap genetic map object (optional) 
+#' @param vcf.cross vcfR object containing the two parent variant calls (optional) 
+#' @param uchr a vector of chromosome names (optional)
+#' @return data.frame of smoothed results with SE
+#' @export
+calcAFD=function(phasedCounts, experiment.name='', 
+                           sample.size=250000, 
+                           sel.strength=.5,
+                           bin.width=500,
+                           eff.length=600,
+                           gmap=NULL,
+                           vcf.cross=NULL,
+                           uchr = paste0('chr', as.roman(1:16))
+                          ){
   
-    print(paste("sample size based on n for low tail = ", round(effective.sample.n.low)))
-    print(paste("sample size based on n for high tail = ", round(effective.sample.n.high)))
-    print(paste("sample size based on n both tails = ", round(effective.sample.n.two.tailed)))
-
-    #sample.n.tail=sample.size*sel.frac
-    #print(paste('actual sample size= ', sample.n.tail, ' |  estimated sample size', sum(r+a)/eff.length ))
-    depth.sample.size.low=sum(results.data$p1.low+results.data$p2.low)/eff.length 
-    depth.sample.size.high=sum(results.data$p1.high+results.data$p2.high)/eff.length 
-    depth.both=1/((depth.sample.size.low+depth.sample.size.high)/(depth.sample.size.low*depth.sample.size.high))
+    chrom=data.table::tstrsplit(phasedCounts$ID, '_')[[1]]
+    #uchr=paste0('chr', as.roman(1:16))
+    chrom=factor(chrom, levels=uchr)
+    physical.position=data.table::tstrsplit(phasedCounts$ID, '_', type.convert=T)[[2]]
+    coreCols=data.frame(chrom=chrom, 
+                        physical.position=physical.position)
     
-    print(paste("sample size based on depth for low tail = ", round(depth.sample.size.low)))
-    print(paste("sample size based on depth for high tail = ", round(depth.sample.size.high)))
-    print(paste("sample size based on depth for both tails = ", round(depth.both)))
+    if(!is.null(gmap) & !is.null(vcf.cross)){
+        genetic.position=stack(jitterGmapVector(getGmapPositions(vcf.cross, gmap, uchr)))$values
+        coreCols$genetic.position= genetic.position
+    }
 
-    n.low=min(effective.sample.n.low,    depth.sample.size.low)
-    n.high=min(effective.sample.n.high,  depth.sample.size.high)
-    n.both=1/((n.low+n.high)/(n.low*n.high))
-    return(list(n.low=n.low, n.high=n.high,n.both=n.both))
+    pC = dplyr::bind_cols(coreCols, phasedCounts) %>% 
+            dplyr::mutate(nindv=round(sample.size*sel.strength)) %>%
+            dplyr::mutate(ndepth=round(sum(p1+p2)/eff.length) ) %>%
+            dplyr::mutate(n=min(nindv,ndepth)) %>%
+            dplyr::group_by(chrom) %>%
+            #dplyr::group_map(~dplyr::mutate(., 
+            #   afd=doBlockLoess(.x$p1, .x$p2,.x$physical.position)), .keep=T) %>%
+            #dplyr::bind_rows() %>% 
+            dplyr::mutate(afd=doBlockLoess(p1, p2,physical.position, bin.width=bin.width)) %>% 
+            dplyr::bind_rows() %>%
+            dplyr::mutate(afd.se=sqrt((afd*(1-afd))/n)) 
+       if(!is.null(gmap) & !is.null(vcf.cross)){
+            pC=pC %>% dplyr::rename_with(.,~gsub('$', paste0('_', experiment.name), .x), .cols=c(-ID,-chrom, -physical.position,-genetic.position))
+       } else{
+            pC=pC %>% dplyr::rename_with(.,~gsub('$', paste0('_', experiment.name), .x), .cols=c(-ID,-chrom, -physical.position))
+
+       }
+    attr(pC, 'experiment.name')=experiment.name
+    return(pC)
+   
+}
+
+
+##' Use inverse variance weighting to combine information across replicates
+##'
+##' @param results data frame of results, should contain smoothed allele-frequency differences (afd) and SEs (afd.se)
+##' @param meta_name specify name of meta analysis beta and se
+##' @return combined.results meta analysis Betas and SEs added to results merged across the replicates 
+##' @export 
+calcMetaAFD=function(results, meta_name="meta"){
+    combined.results = results %>% purrr::reduce(dplyr::left_join) %>% dplyr::ungroup()#, by=c('ID', 'chrom', 'physical.position') #%>% dplyr::ungroup()
+    
+    w=1/(combined.results %>% dplyr::select(starts_with('afd.se')))^2
+    m=combined.results %>% dplyr::select(starts_with('afd_'))
+    sw=apply(w, 1, sum)
+    wm=apply(m*w, 1, sum)/sw
+    wm.se=sqrt(1/sw)
+    combined.results$wm=wm
+    combined.results$wm.se=wm.se
+    combined.results=combined.results %>% dplyr::rename(!!meta_name :=wm,!!paste0(meta_name,'.se') :=wm.se )
+    return(combined.results)
+}
+
+
+##' Calculate allele frequency between tails, or tail and control. Convert to Z, p-value, and LOD.
+##'
+##' @param results list of two data frames of results to compare, should contain column names of betas and se with prefix L and R 
+##' @param L prefix for column name containing beta (L) and SE L.se 
+##' @param R prefix for column name containing beta (R) and SE R.se 
+##' @return combined.results meta analysis Betas and SEs added to results merged across the replicates 
+##' @export 
+calcContrastStats=function(results, L='meta_high', R='meta_low'){
+    
+    combined.results = results %>% purrr::reduce(dplyr::left_join) %>% dplyr::ungroup() #, by=c('ID', 'chrom', 'physical.position') #%>% dplyr::ungroup()
+    #contrast.label=paste0(L,'-',R)
+    if(!is.null(R)){
+        combined.results$contrast.beta=as.numeric(unlist(combined.results[,L]-combined.results[,R]))
+        combined.results$contrast.beta.se = as.numeric(unlist(sqrt(combined.results[,paste0(L, '.se')]^2+combined.results[,paste0(R,'.se')]^2)))
+        combined.results = combined.results %>% dplyr::mutate(z=contrast.beta/contrast.beta.se)
+    } else {
+        combined.results$z = as.numeric(unlist(combined.results[,L]/combined.results[,paste0(L, '.se')]))
+    }
+    combined.results=combined.results %>% 
+        dplyr::mutate(p= 2*pnorm(abs(z), lower.tail=F) ) %>%
+        dplyr::mutate(LOD=PvalToLOD(p)) %>%suppressWarnings()
+
+    return(combined.results)
+}
+
+##' Plot individual experiment results
+##'
+##' @param results data.frame of experiment results 
+##' @param suffix of experiment name 
+##' @param simulatedQTL data frame of chromosome, and position of simulated QTL (optional)
+##' @return ggplot object of experiment results  
+##' @export 
+##' @import ggplot2
+plotIndividualExperiment=function(results, suffix,simulatedQTL=NULL){   
+#suffix='high1'
+    p1=rlang::sym(paste0('p1_',suffix))
+    p2=rlang::sym(paste0('p2_',suffix))
+    afd=rlang::sym(paste0('afd_', suffix))
+    afd.se=rlang::sym(paste0('afd.se_', suffix))
+    expected=rlang::sym(paste0('expected.phased_', suffix))
+    if(paste0('expected.phased_', suffix)  %in% colnames(results) ) {Switch=T} else {Switch=F}
+
+
+  ggplot(results, aes(x=physical.position,y={{p1}}/({{p1}}+{{p2}})))+    
+    geom_point(size=0.3,alpha=0.6, color='gray21')+
+    {if(!is.null(simulatedQTL))
+        geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')}+
+    facet_grid(~chrom, scales='free_x', space='free_x') +
+    geom_ribbon(aes(ymin={{afd}}-1.96*{{afd.se}}, ymax={{afd}}+1.96*{{afd.se}}, fill='grey'), 
+                alpha=0.7,linetype='dashed', color='grey')+
+    geom_line(aes(x=physical.position, y={{afd}}),color='red', size=2, alpha=1)+
+    {if(Switch) 
+    geom_line(aes(x=physical.position, y={{expected}}),color='black', size=.5)}+
+    theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position='none')+ggtitle(suffix)
+
+}
+
+##' Plot contrast of experiment 1 - experiment 2
+##'
+##' @param results data.frame of experiment results 
+##' @param suffix1 of experiment 1 name  
+##' @param suffix2 of experiment 2 name 
+##' @param simulatedQTL data frame of chromosome, and position of simulated QTL (optional)
+##' @return ggplot object of experiment results  
+##' @export 
+##' @import ggplot2
+plotContrast=function(results, suffix1, suffix2, simulatedQTL=NULL) {
+    Lp1=rlang::sym(paste0('p1_',suffix1))
+    Lp2=rlang::sym(paste0('p2_',suffix1))
+    Lafd=rlang::sym(paste0('afd_', suffix1))
+    Lafd.se=rlang::sym(paste0('afd.se_', suffix1))
+    Lexpected=rlang::sym(paste0('expected.phased_', suffix1))
+    if(paste0('expected.phased_', suffix1)  %in% colnames(results) ) {SwitchL=T} else {SwitchL=F}
+
+    Rp1=rlang::sym(paste0('p1_',suffix2))
+    Rp2=rlang::sym(paste0('p2_',suffix2))
+    Rafd=rlang::sym(paste0('afd_', suffix2))
+    Rafd.se=rlang::sym(paste0('afd.se_', suffix2))
+    Rexpected=rlang::sym(paste0('expected.phased_', suffix2))
+    if(paste0('expected.phased_', suffix2)  %in% colnames(results) ) {SwitchL=T} else {SwitchL=F}
+
+    ggplot(results, aes(x=physical.position,y=({{Lp1}}/({{Lp1}}+{{Lp2}}))-({{Rp1}}/({{Rp1}}+{{Rp2}}))))+
+    geom_point(size=0.3,alpha=0.6, color='gray21')+
+    {if(!is.null(simulatedQTL))
+        geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')}+
+    facet_grid(~chrom, scales='free_x', space='free_x')+
+    geom_ribbon(aes(ymin=({{Lafd}}-{{Rafd}})-1.96*sqrt( {{Lafd.se}}^2+{{Rafd.se}}^2),
+                    ymax=({{Lafd}}-{{Rafd}})+1.96*sqrt( {{Lafd.se}}^2+{{Rafd.se}}^2), fill='grey'), 
+                     alpha=0.7,linetype='dashed', color='grey')+
+    geom_line(aes(x=physical.position, y={{Lafd}}-{{Rafd}}),color='red', size=2, alpha=1)+ 
+    geom_line(aes(x=physical.position, y={{Lexpected}}-{{Rexpected}}),color='black', size=.5)+
+    theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position='none')+
+    ggtitle(paste(suffix1, '-', suffix2))
+
+}
+
+##' Plot summary contrast and standard error, as well as -log10(p)
+##'
+##' @param results data.frame of experiment results 
+##' @param simulatedQTL data frame of chromosome, and position of simulated QTL (optional)
+##' @param effective.n.test effective number of tests genomewide (integer)
+##' @return ggplot object of experiment results  
+##' @export 
+##' @import ggplot2
+plotSummary=function(results, simulatedQTL=NULL, effective.n.tests=600){   
+    #suffix='high1'
+
+    Z=ggplot(results, aes(x=physical.position,y=contrast.beta))+    
+        #geom_line(size=0.3,alpha=0.6, color='gray21')+
+        geom_line(color='black', size=.5)+ 
+        {if(!is.null(simulatedQTL))
+        geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')}+
+        facet_grid(~chrom, scales='free_x', space='free_x') +
+        geom_ribbon(aes(ymin=contrast.beta-1.96*contrast.beta.se, ymax=contrast.beta+1.96*contrast.beta.se, fill='grey'), 
+                    alpha=0.7,linetype='dashed', color='grey')+
+        #geom_line(aes(x=physical.position, y={{afd}}),color='red', size=2, alpha=1)+
+        #{if(Switch) 
+        #geom_line(aes(x=physical.position, y={{expected}}),color='black', size=.5)}+
+        theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position='none')+ggtitle('contrast.beta')
+     nlp=ggplot(results, aes(x=physical.position, y=-log10(p)))+geom_line(color='black', size=1.5)+ 
+          {if(!is.null(simulatedQTL))
+            geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')}+
+            facet_grid(~chrom, scales='free_x', space='free_x')+
+            geom_hline(aes(yintercept=-log10(.05/effective.n.tests)), color='red')+
+            theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1))+ggtitle('-log10(p)')
+
+     ggpubr::ggarrange(Z,nlp, nrow=2) 
 }
 
 
