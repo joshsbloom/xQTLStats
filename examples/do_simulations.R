@@ -96,52 +96,55 @@ ggpubr::ggarrange(h1, l1, c1, nrow=3)
 x11()
 plotSummary(results, simulatedQTL)
 
-library(ggplot2)
-high.plot= 
-    ggplot(results.data, aes(x=physical.position,y=p1.high/(p1.high+p2.high)))+
-    geom_point(size=0.3,alpha=0.6, color='gray21')+
-    geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')+
-    facet_grid(~chrom, scales='free_x', space='free_x')+
-    geom_ribbon(aes(ymin=afd.high-1.96*afd.high.se, ymax=afd.high+1.96*afd.high.se, fill='grey'), 
-                alpha=0.7,linetype='dashed', color='grey')+
-    geom_line(aes(x=physical.position, y=afd.high),color='red', size=2, alpha=1)+ 
-    geom_line(aes(x=physical.position, y=expected.af.high),color='black', size=.5)+
-    theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position='none')+ggtitle('high tail')
 
-low.plot=
-    ggplot(results.data, aes(x=physical.position,y=p1.low/(p1.low+p2.low)))+
-    geom_point(size=0.3,alpha=0.6, color='gray21')+
-    geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')+
-    facet_grid(~chrom, scales='free_x', space='free_x')+
-    geom_ribbon(aes(ymin=afd.low-1.96*afd.low.se, ymax=afd.low+1.96*afd.low.se, fill='grey'), 
-                alpha=0.7,linetype='dashed', color='grey')+
-    geom_line(aes(x=physical.position, y=afd.low),color='red', size=2, alpha=1)+ 
-    geom_line(aes(x=physical.position, y=expected.af.low),color='black', size=.5)+
-    theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position='none')+ggtitle('low tail')
 
-#ggpubr::ggarrange(high.plot, low.plot, nrow=2) 
 
-contrast.plot=ggplot(results.data, aes(x=physical.position,y=(p1.high/(p1.high+p2.high))-(p1.low/(p1.low+p2.low))))+
-    geom_point(size=0.3,alpha=0.6, color='gray21')+
-    geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')+
-    facet_grid(~chrom, scales='free_x', space='free_x')+
-    geom_ribbon(aes(ymin=afd.contrast-1.96*afd.contrast.se, ymax=afd.contrast+1.96*afd.contrast.se, fill='grey'), 
-                     alpha=0.7,linetype='dashed', color='grey')+
-    geom_line(aes(x=physical.position, y=afd.contrast),color='red', size=2, alpha=1)+ 
-    geom_line(aes(x=physical.position, y=expected.af.high-expected.af.low),color='black', size=.5)+
-    theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position='none')+
-    ggtitle('allele frequence contrast')
-
-#ggplot(results.data, aes(x=physical.position, y=afd.contrast.LOD))+geom_line(color='black', size=1.5)+ 
+#library(ggplot2)
+#high.plot= 
+#    ggplot(results.data, aes(x=physical.position,y=p1.high/(p1.high+p2.high)))+
+#    geom_point(size=0.3,alpha=0.6, color='gray21')+
+#    geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')+
+#    facet_grid(~chrom, scales='free_x', space='free_x')+
+#    geom_ribbon(aes(ymin=afd.high-1.96*afd.high.se, ymax=afd.high+1.96*afd.high.se, fill='grey'), 
+#                alpha=0.7,linetype='dashed', color='grey')+
+#    geom_line(aes(x=physical.position, y=afd.high),color='red', size=2, alpha=1)+ 
+#    geom_line(aes(x=physical.position, y=expected.af.high),color='black', size=.5)+
+#    theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position='none')+ggtitle('high tail')
+#
+#low.plot=
+#    ggplot(results.data, aes(x=physical.position,y=p1.low/(p1.low+p2.low)))+
+#    geom_point(size=0.3,alpha=0.6, color='gray21')+
+#    geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')+
+#    facet_grid(~chrom, scales='free_x', space='free_x')+
+#    geom_ribbon(aes(ymin=afd.low-1.96*afd.low.se, ymax=afd.low+1.96*afd.low.se, fill='grey'), 
+#                alpha=0.7,linetype='dashed', color='grey')+
+#    geom_line(aes(x=physical.position, y=afd.low),color='red', size=2, alpha=1)+ 
+#    geom_line(aes(x=physical.position, y=expected.af.low),color='black', size=.5)+
+#    theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position='none')+ggtitle('low tail')
+#
+##ggpubr::ggarrange(high.plot, low.plot, nrow=2) 
+#
+#contrast.plot=ggplot(results.data, aes(x=physical.position,y=(p1.high/(p1.high+p2.high))-(p1.low/(p1.low+p2.low))))+
+#    geom_point(size=0.3,alpha=0.6, color='gray21')+
+#    geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')+
+#    facet_grid(~chrom, scales='free_x', space='free_x')+
+#    geom_ribbon(aes(ymin=afd.contrast-1.96*afd.contrast.se, ymax=afd.contrast+1.96*afd.contrast.se, fill='grey'), 
+#                     alpha=0.7,linetype='dashed', color='grey')+
+#    geom_line(aes(x=physical.position, y=afd.contrast),color='red', size=2, alpha=1)+ 
+#    geom_line(aes(x=physical.position, y=expected.af.high-expected.af.low),color='black', size=.5)+
+#    theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position='none')+
+#    ggtitle('allele frequence contrast')
+#
+##ggplot(results.data, aes(x=physical.position, y=afd.contrast.LOD))+geom_line(color='black', size=1.5)+ 
+##        facet_grid(~chrom, scales='free_x', space='free_x')+
+##        theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1))+ggtitle('LOD')
+#neglogp.plot=ggplot(results.data, aes(x=physical.position, y=-log10(afd.contrast.p)))+geom_line(color='black', size=1.5)+ 
+#         geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')+
 #        facet_grid(~chrom, scales='free_x', space='free_x')+
-#        theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1))+ggtitle('LOD')
-neglogp.plot=ggplot(results.data, aes(x=physical.position, y=-log10(afd.contrast.p)))+geom_line(color='black', size=1.5)+ 
-         geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')+
-        facet_grid(~chrom, scales='free_x', space='free_x')+
-        geom_hline(aes(yintercept=-log10(.05/600)), color='red')+
-        theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1))+ggtitle('-log10(p)')
-
- ggpubr::ggarrange(high.plot, low.plot, contrast.plot, neglogp.plot, nrow=4) 
+#        geom_hline(aes(yintercept=-log10(.05/600)), color='red')+
+#        theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1))+ggtitle('-log10(p)')
+#
+# ggpubr::ggarrange(high.plot, low.plot, contrast.plot, neglogp.plot, nrow=4) 
 
 
 
@@ -155,69 +158,4 @@ neglogp.plot=ggplot(results.data, aes(x=physical.position, y=-log10(afd.contrast
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#chrom=data.table::tstrsplit(rownames(geno.matrix), '_')[[1]]
-#chrom=factor(chrom, levels=uchr)
-#physical.position=data.table::tstrsplit(rownames(geno.matrix), '_', type.convert=T)[[2]]
-
-chrom=data.table::tstrsplit(high.tail$ID, '_')[[1]]
-uchr=paste0('chr', as.roman(1:16))
-chrom=factor(chrom, levels=uchr)
-physical.position=data.table::tstrsplit(high.tail$ID, '_', type.convert=T)[[2]]
-genetic.position=stack(jitterGmapVector(getGmapPositions(vcf.cross, gmaps[['B']], uchr)))$values
-
-results.data=data.frame(chrom=chrom, 
-                        physical.position=physical.position,
-                        genetic.postion=genetic.position,
-                        expected.af.high=high.tail$expected.phased,
-                        expected.af.low=low.tail$expected.phased,
-                        p1.high=high.tail$p1,
-                        p2.high=high.tail$p2,
-                        p1.low=low.tail$p1,
-                        p2.low=low.tail$p2)
-
-sampleN=getSampleSizes(results.data, sample.size, sel.high, sel.low, eff.length=600)
-
-library('magrittr')
-
-results.data=results.data %>% 
-    dplyr::group_by(chrom) %>%
-    dplyr::group_map(~dplyr::mutate(., 
-       afd.high=doBlockLoess(.x$p1.high, .x$p2.high,.x$physical.position), 
-        afd.low=doBlockLoess(.x$p1.low,  .x$p2.low, .x$physical.position)), 
-              .keep=T) %>% dplyr::bind_rows() %>%
-    dplyr::mutate( afd.high.se=sqrt((afd.high*(1-afd.high))/sampleN$n.high),
-            afd.low.se =sqrt((afd.low *(1-afd.low))/sampleN$n.low)   )%>%
-    dplyr::mutate( afd.contrast=afd.high-afd.low, 
-            afd.contrast.se=sqrt(afd.high.se^2+afd.low.se^2)   )%>% 
-    dplyr::mutate( afd.contrast.z=afd.contrast/ afd.contrast.se ) %>%
-    dplyr::mutate( afd.contrast.p= 2*pnorm(abs(afd.contrast.z), lower.tail=F) ) %>% 
-    dplyr::mutate( afd.contrast.LOD=PvalToLOD(afd.contrast.p)) %>%  suppressWarnings()
-
-
-
-
- #   test=vcfR::masplit(eg.AD, record=1)
- #   plot(log10(test[,2]+1))
- #   test=masplit(eg.AD, record=2)
- #   plot(log10(test[,2]+1))
-
- #   vcfR::write.vcf(vcf.cross, '~/test.vcf.gz')
 
