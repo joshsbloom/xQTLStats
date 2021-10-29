@@ -275,9 +275,15 @@ calcContrastStats=function(results, L='meta_high', R='meta_low'){
     combined.results = results %>% purrr::reduce(dplyr::left_join) %>% dplyr::ungroup() #, by=c('ID', 'chrom', 'physical.position') #%>% dplyr::ungroup()
     #contrast.label=paste0(L,'-',R)
     if(!is.null(R)){
-        combined.results$contrast.beta=as.numeric(unlist(combined.results[,L]-combined.results[,R]))
-        combined.results$contrast.beta.se = as.numeric(unlist(sqrt(combined.results[,paste0(L, '.se')]^2+combined.results[,paste0(R,'.se')]^2)))
-        combined.results = combined.results %>% dplyr::mutate(z=contrast.beta/contrast.beta.se)
+        #calc contrasts without meta analysis 
+        if(grepl('^_', L)){
+                combined.results$contrast.beta=as.numeric(unlist(combined.results[,paste0('afd',L)]-combined.results[,paste0('afd',R)]))
+                combined.results$contrast.beta.se = as.numeric(unlist(sqrt(combined.results[,paste0('afd.se',L)]^2+combined.results[,paste0('afd.se',R)]^2)))
+        }else{
+            combined.results$contrast.beta=as.numeric(unlist(combined.results[,L]-combined.results[,R]))
+            combined.results$contrast.beta.se = as.numeric(unlist(sqrt(combined.results[,paste0(L, '.se')]^2+combined.results[,paste0(R,'.se')]^2)))
+        }
+       combined.results = combined.results %>% dplyr::mutate(z=contrast.beta/contrast.beta.se)
     } else {
         combined.results$z = as.numeric(unlist(combined.results[,L]/combined.results[,paste0(L, '.se')]))
     }
@@ -353,7 +359,8 @@ plotContrast=function(results, suffix1, suffix2, simulatedQTL=NULL) {
                     ymax=({{Lafd}}-{{Rafd}})+1.96*sqrt( {{Lafd.se}}^2+{{Rafd.se}}^2), fill='grey'), 
                      alpha=0.7,linetype='dashed', color='grey')+
     geom_line(aes(x=physical.position, y={{Lafd}}-{{Rafd}}),color='red', size=2, alpha=1)+ 
-    geom_line(aes(x=physical.position, y={{Lexpected}}-{{Rexpected}}),color='black', size=.5)+
+    {if(SwitchL)
+    geom_line(aes(x=physical.position, y={{Lexpected}}-{{Rexpected}}),color='black', size=.5)}+
     theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position='none')+
     ggtitle(paste(suffix1, '-', suffix2))
 

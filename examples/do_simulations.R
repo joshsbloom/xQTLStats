@@ -14,7 +14,7 @@ ref.vcf=system.file('reference', 'parents_w_svar_sorted.vcf.gz', package='xQTLSt
 #
 #p1.name='YPS163a' #'BYa'
 #p2.name='YJM145x' #'RMx'
-sample.size=5e4 #2.5e5 #.5e5 #2.5e5 #2.5e5
+#sample.size=5e4 #2.5e5 #.5e5 #2.5e5 #2.5e5
 
 cross='B'
 #for(cross in names(crosses.to.parents)){
@@ -22,7 +22,71 @@ cross='B'
     p2.name=crosses.to.parents[[cross]][2]
    
 vcf.cross=getCrossVCF(ref.vcf,p1.name, p2.name)
-    #  saveRDS(vcf.cross, file = paste0('/data/xQTL/', cross, '_vcf.RDS')) 
+  
+
+experiment.vcf.file=system.file('data','B_250K_h2_40_40_QTL_250Kpop_10percenttails.vcf.gz', package='xQTLStats')
+experiment.vcf=vcfR::read.vcfR(experiment.vcf.file) #'/data/xQTL/sim.vcf.gz')
+
+low.tail.name='low.tail.sim'
+high.tail.name='high.tail.sim'
+
+low.tail=getBiallelicCounts(experiment.vcf, low.tail.name)
+high.tail=getBiallelicCounts(experiment.vcf, high.tail.name)
+
+#low.tail$expected=low.tail.expected[low.tail$ID]
+#high.tail$expected=high.tail.expected[high.tail$ID]
+
+
+#get simulated high tail
+sel.low  = 0.1
+sel.high = 0.1
+sample.size=250000
+#phase everything 
+low.tail  = phaseCounts(vcf.cross, p1.name, low.tail)
+high.tail = phaseCounts(vcf.cross, p1.name, high.tail)
+
+
+#----------------------------------------------------------------------------
+low.tail  = calcAFD(low.tail, experiment.name='low',sample.size=sample.size, sel.strength=sel.low)
+high.tail = calcAFD(high.tail, experiment.name='high',sample.size=sample.size, sel.strength=sel.high)
+
+
+results=calcContrastStats(list(high.tail, low.tail), L='_high', R='_low')
+
+
+h1=plotIndividualExperiment(results, 'high')#,simulatedQTL)
+l1=plotIndividualExperiment(results, 'low') #,simulatedQTL)
+c1=plotContrast(results, 'high', 'low') #,simulatedQTL)
+
+ggpubr::ggarrange(h1, l1, c1, nrow=3) 
+
+x11()
+plotSummary(results, simulatedQTL)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#  saveRDS(vcf.cross, file = paste0('/data/xQTL/', cross, '_vcf.RDS')) 
 
     #simulation bit ----------------------------------------------------------
     #    geno.matrix=simHaploidSegsFN(vcf.cross, gmaps[[cross]], sample.size, ngenerations=24)
