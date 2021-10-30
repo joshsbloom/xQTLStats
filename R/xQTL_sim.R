@@ -217,8 +217,17 @@ generateCounts=function(y, sx, sel.frac, depth, lower.tail=F) {
     }
     sel.indv.x=sx[,sel.indv]
 
+    #lol R can't handle it, break it up
+    splitit=cut(1:ncol(sel.indv.x),5, labels=F)
+    saf=lapply(1:5, function(h){
+               idx=which(splitit==h)
+               return(Rfast::rowsums(sel.indv.x[,idx])) #/ncol(sel.indv.x)
+                           })
+    sel.indv.af=Rfast::rowsums(do.call('cbind', saf))/ncol(sel.indv.x)
+
+
     #assuming 0/1 coding 
-    sel.indv.af=Rfast::rowsums(sel.indv.x)/ncol(sel.indv.x)
+    #sel.indv.af=Rfast::rowsums(sel.indv.x)/ncol(sel.indv.x)
     #plot(sel.indv.af)
 
     r=rbinom(n=length(sel.indv.af),size=depth, prob=sel.indv.af)
@@ -242,12 +251,12 @@ generateCounts=function(y, sx, sel.frac, depth, lower.tail=F) {
 #' @export
 simXQTLExperiment=function(y, geno.matrix, vcf.cross, sel.low=0.1, sel.high=0.1,depth.low=50, depth.high=50, vcf.out=NULL){
     #get simulated high tail
-    sel.low=0.1
-    sel.high=0.1
+    #sel.low=0.1
+    #sel.high=0.1
 
     #simulated depth
-    depth.high=50
-    depth.low=50
+    #depth.high=50
+    #depth.low=50
 
     low.tail  = generateCounts(y,geno.matrix, sel.low, depth.low, lower.tail=T)
     high.tail = generateCounts(y,geno.matrix, sel.high, depth=depth.high)
@@ -288,7 +297,6 @@ simXQTLExperiment=function(y, geno.matrix, vcf.cross, sel.low=0.1, sel.high=0.1,
         expected.af=list(low.tail.expected=low.tail.expected, high.tail.expected=high.tail.expected)
         return(expected.af)
     } else{
-    
         return(list(low.tail=low.tail, high.tail=high.tail))
     }
 }

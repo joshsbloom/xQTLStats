@@ -370,7 +370,7 @@ plotContrast=function(results, suffix1, suffix2, simulatedQTL=NULL) {
 ##'
 ##' @param results data.frame of experiment results 
 ##' @param simulatedQTL data frame of chromosome, and position of simulated QTL (optional)
-##' @param effective.n.test effective number of tests genomewide (integer)
+##' @param effective.n.tests effective number of tests genomewide (integer)
 ##' @return ggplot object of experiment results  
 ##' @export 
 ##' @import ggplot2

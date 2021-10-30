@@ -31,4 +31,7 @@ Imports:
 Suggests:
     Meiosis,
     devtools,
-    roxygen2
+    roxygen2,
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
