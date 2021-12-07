@@ -250,7 +250,7 @@ calcAFD=function(phasedCounts, experiment.name='',
 ##' @export 
 calcMetaAFD=function(results, meta_name="meta"){
     combined.results = results %>% purrr::reduce(dplyr::left_join) %>% dplyr::ungroup()#, by=c('ID', 'chrom', 'physical.position') #%>% dplyr::ungroup()
-    
+
     w=1/(combined.results %>% dplyr::select(starts_with('afd.se')))^2
     m=combined.results %>% dplyr::select(starts_with('afd_'))
     sw=apply(w, 1, sum)

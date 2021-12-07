@@ -210,21 +210,27 @@ simPhenotypesForRefPop=function(sx, h2=.1, nQTL=1) {
 generateCounts=function(y, sx, sel.frac, depth, lower.tail=F) {
     #$sel.frac=.10
     #get positive tail
-    if(lower.tail==F) {
-        sel.indv=which(y> quantile(y,1-sel.frac))
-    } else{
-        sel.indv=which(y< quantile(y,sel.frac))
+    
+    if(sel.frac==1) { 
+    
+    sel.indv.af=attr(geno.matrix, 'sel.indv.af')
+    } else {
+    
+        if(lower.tail==F) {
+            sel.indv=which(y> quantile(y,1-sel.frac))
+        } else{
+            sel.indv=which(y< quantile(y,sel.frac))
+        }
+        sel.indv.x=sx[,sel.indv]
+
+        #lol R can't handle it, break it up
+        splitit=cut(1:ncol(sel.indv.x),5, labels=F)
+        saf=lapply(1:5, function(h){
+                   idx=which(splitit==h)
+                   return(Rfast::rowsums(sel.indv.x[,idx])) #/ncol(sel.indv.x)
+                               })
+        sel.indv.af=Rfast::rowsums(do.call('cbind', saf))/ncol(sel.indv.x)
     }
-    sel.indv.x=sx[,sel.indv]
-
-    #lol R can't handle it, break it up
-    splitit=cut(1:ncol(sel.indv.x),5, labels=F)
-    saf=lapply(1:5, function(h){
-               idx=which(splitit==h)
-               return(Rfast::rowsums(sel.indv.x[,idx])) #/ncol(sel.indv.x)
-                           })
-    sel.indv.af=Rfast::rowsums(do.call('cbind', saf))/ncol(sel.indv.x)
-
 
     #assuming 0/1 coding 
     #sel.indv.af=Rfast::rowsums(sel.indv.x)/ncol(sel.indv.x)
@@ -351,6 +357,41 @@ phaseCounts=function(vcf.cross, p1.name, df, uchr=paste0('chr', as.roman(1:16)))
     df$p1=p1
     df$p2=p2
     return(df)
+}
+
+#' Simulate phenotypes for haploid prograny for an XSnpMatrix with reference-based biallelic coding coming from a BayesC genetic architecture
+#' @param geno.matrix XSnpMatrix
+#' @param h2 total additive heritability
+#' @param target.size fraction of markers with effects sampled from N(0,h^2)
+#' @return y vector of simulated phenotype, scaled so total phenotypic variance is 1
+#' @export
+simBayesC=function(geno.matrix,target.size=0.1, h2=0.4 ){
+    #geno.matrix=matrix(as.numeric(geno.matrix@.Data), nrow(geno.matrix), ncol(geno.matrix))
+    #target.size=.1
+    nmarker=nrow(geno.matrix)
+    nsample=ncol(geno.matrix)
+
+    tindx=round(target.size*nrow(geno.matrix))
+    causal.indices=sort.int(sample(1:nrow(geno.matrix), tindx))
+    causal.betas=rnorm(tindx)
+    #snorm=matrix(rnorm(nrow(geno.matrix)),1)
+    a.eff=rep(0,ncol(geno.matrix))
+    for(m in 1:length(causal.indices)) {
+        if(m%%1000==0) {print(m)}
+        a.eff=a.eff+as.numeric(geno.matrix[causal.indices[m],])*causal.betas[m] #snorm[m]
+        #print(m)
+       # g=as.matrix(geno.matrix@.Data)
+    }
+    a.eff=scale(a.eff)
+    g=sqrt(h2)*a.eff #+ sqrt(H2-h2)*aa.eff
+    y=g+rnorm(nsample,mean=0,sd=sqrt((1-h2)/h2*var(g)))
+    y=scale(as.vector(y)) 
+
+    attr(y, "causal.indices")=causal.indices
+    attr(y, "causal.betas")=causal.betas
+   
+    return(y)
+
 }
 
 
