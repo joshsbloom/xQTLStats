@@ -10,5 +10,6 @@ devtools::install_github("joshsbloom/xQTLStats" ,ref="main")
 
 ### Usage
 see [FluconazoleV1_041825](examples/FluconazoleV1_041825) for basic analysis of biparental crosses
+
 see [do_simulations.R](examples/do_simulations.R) for example advanced usage
 ___
