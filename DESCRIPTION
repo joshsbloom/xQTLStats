@@ -1,6 +1,6 @@
 Package: xQTLStats
 Title: Simulation and Analysis of xQTL experiments
-Version: 0.1
+Version: 0.2
 Authors@R: 
     person(given = "Joshua",
            family = "Bloom",
