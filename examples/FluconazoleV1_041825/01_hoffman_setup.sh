@@ -18,7 +18,7 @@ mamba create --name genomics bwa gatk4 bcftools sambamba r-tidyverse r-qs r-vcfr
 mamba activate genomics 
 
 #start R, in R 
-devtools::install_github("joshsbloom/ComplexTraitTools/xQTLStats" ,ref="main")
+devtools::install_github("joshsbloom/xQTLStats" ,ref="main")
 
 
 #for basespace download from personal directory on basespace 
