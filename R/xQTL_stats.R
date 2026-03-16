@@ -264,21 +264,38 @@ calcMetaAFD=function(results, meta_name="meta"){
 
 
 ##' Calculate allele frequency between tails, or tail and control. Convert to Z, p-value, and LOD.
-##'
-##' @param results list of two data frames of results to compare, should contain column names of betas and se with prefix L and R 
-##' @param L prefix for column name containing beta (L) and SE L.se 
-##' @param R prefix for column name containing beta (R) and SE R.se 
-##' @return combined.results meta analysis Betas and SEs added to results merged across the replicates 
-##' @export 
+##' @param results list of data frames of results to compare, should contain column names of betas and se with prefix L and R
+##' @param L prefix for column name containing beta (L) and SE L.se, or a numeric constant (e.g. 0.5) to test R against
+##' @param R prefix for column name containing beta (R) and SE R.se, a numeric constant (e.g. 0.5) to test L against, or NULL for single-column z-test
+##' @return combined.results meta analysis Betas and SEs added to results merged across the replicates
+##' @export
 calcContrastStats=function(results, L='meta_high', R='meta_low'){
-    
+
     combined.results = results %>% purrr::reduce(dplyr::left_join) %>% dplyr::ungroup() #, by=c('ID', 'chrom', 'physical.position') #%>% dplyr::ungroup()
     #contrast.label=paste0(L,'-',R)
     if(!is.null(R)){
-        #calc contrasts without meta analysis 
-        if(grepl('^_', L)){
-                combined.results$contrast.beta=as.numeric(unlist(combined.results[,paste0('afd',L)]-combined.results[,paste0('afd',R)]))
-                combined.results$contrast.beta.se = as.numeric(unlist(sqrt(combined.results[,paste0('afd.se',L)]^2+combined.results[,paste0('afd.se',R)]^2)))
+        if(is.numeric(R)){
+            # R is a constant (e.g. 0.5) with no SE -- test L against constant expectation
+            if(grepl('^_', L)){
+                combined.results$contrast.beta=as.numeric(unlist(combined.results[,paste0('afd',L)]))-R
+                combined.results$contrast.beta.se = as.numeric(unlist(combined.results[,paste0('afd.se',L)]))
+            }else{
+                combined.results$contrast.beta=as.numeric(unlist(combined.results[,L]))-R
+                combined.results$contrast.beta.se = as.numeric(unlist(combined.results[,paste0(L, '.se')]))
+            }
+        }else if(is.numeric(L)){
+            # L is a constant (e.g. 0.5) with no SE -- test R against constant expectation
+            if(grepl('^_', R)){
+                combined.results$contrast.beta=L-as.numeric(unlist(combined.results[,paste0('afd',R)]))
+                combined.results$contrast.beta.se = as.numeric(unlist(combined.results[,paste0('afd.se',R)]))
+            }else{
+                combined.results$contrast.beta=L-as.numeric(unlist(combined.results[,R]))
+                combined.results$contrast.beta.se = as.numeric(unlist(combined.results[,paste0(R, '.se')]))
+            }
+        }else if(grepl('^_', L)){
+            #calc contrasts without meta analysis
+            combined.results$contrast.beta=as.numeric(unlist(combined.results[,paste0('afd',L)]-combined.results[,paste0('afd',R)]))
+            combined.results$contrast.beta.se = as.numeric(unlist(sqrt(combined.results[,paste0('afd.se',L)]^2+combined.results[,paste0('afd.se',R)]^2)))
         }else{
             combined.results$contrast.beta=as.numeric(unlist(combined.results[,L]-combined.results[,R]))
             combined.results$contrast.beta.se = as.numeric(unlist(sqrt(combined.results[,paste0(L, '.se')]^2+combined.results[,paste0(R,'.se')]^2)))
@@ -287,7 +304,7 @@ calcContrastStats=function(results, L='meta_high', R='meta_low'){
     } else {
         combined.results$z = as.numeric(unlist(combined.results[,L]/combined.results[,paste0(L, '.se')]))
     }
-    combined.results=combined.results %>% 
+    combined.results=combined.results %>%
         dplyr::mutate(p= 2*pnorm(abs(z), lower.tail=F) ) %>%
         dplyr::mutate(LOD=PvalToLOD(p)) %>%suppressWarnings()
 
