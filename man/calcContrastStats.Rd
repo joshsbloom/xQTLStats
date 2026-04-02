@@ -7,11 +7,11 @@
 calcContrastStats(results, L = "meta_high", R = "meta_low")
 }
 \arguments{
-\item{results}{list of two data frames of results to compare, should contain column names of betas and se with prefix L and R}
+\item{results}{list of data frames of results to compare, should contain column names of betas and se with prefix L and R}
 
-\item{L}{prefix for column name containing beta (L) and SE L.se}
+\item{L}{prefix for column name containing beta (L) and SE L.se, or a numeric constant (e.g. 0.5) to test R against}
 
-\item{R}{prefix for column name containing beta (R) and SE R.se}
+\item{R}{prefix for column name containing beta (R) and SE R.se, a numeric constant (e.g. 0.5) to test L against, or NULL for single-column z-test}
 }
 \value{
 combined.results meta analysis Betas and SEs added to results merged across the replicates

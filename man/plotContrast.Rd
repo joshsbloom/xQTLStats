@@ -4,7 +4,14 @@
 \alias{plotContrast}
 \title{Plot contrast of experiment 1 - experiment 2}
 \usage{
-plotContrast(results, suffix1, suffix2, simulatedQTL = NULL)
+plotContrast(
+  results,
+  suffix1,
+  suffix2,
+  simulatedQTL = NULL,
+  p1.name = NULL,
+  p2.name = NULL
+)
 }
 \arguments{
 \item{results}{data.frame of experiment results}
@@ -14,6 +21,10 @@ plotContrast(results, suffix1, suffix2, simulatedQTL = NULL)
 \item{suffix2}{of experiment 2 name}
 
 \item{simulatedQTL}{data frame of chromosome, and position of simulated QTL (optional)}
+
+\item{p1.name}{short name of parent 1 strain (displayed at y-axis max)}
+
+\item{p2.name}{short name of parent 2 strain (displayed at y-axis min)}
 }
 \value{
 ggplot object of experiment results

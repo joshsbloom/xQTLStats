@@ -4,7 +4,13 @@
 \alias{plotIndividualExperiment}
 \title{Plot individual experiment results}
 \usage{
-plotIndividualExperiment(results, suffix, simulatedQTL = NULL)
+plotIndividualExperiment(
+  results,
+  suffix,
+  simulatedQTL = NULL,
+  p1.name = NULL,
+  p2.name = NULL
+)
 }
 \arguments{
 \item{results}{data.frame of experiment results}
@@ -12,6 +18,10 @@ plotIndividualExperiment(results, suffix, simulatedQTL = NULL)
 \item{suffix}{of experiment name}
 
 \item{simulatedQTL}{data frame of chromosome, and position of simulated QTL (optional)}
+
+\item{p1.name}{short name of parent 1 strain (displayed at y=1)}
+
+\item{p2.name}{short name of parent 2 strain (displayed at y=0)}
 }
 \value{
 ggplot object of experiment results

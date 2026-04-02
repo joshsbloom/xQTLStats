@@ -4,7 +4,13 @@
 \alias{plotSummary}
 \title{Plot summary contrast and standard error, as well as -log10(p)}
 \usage{
-plotSummary(results, simulatedQTL = NULL, effective.n.tests = 600)
+plotSummary(
+  results,
+  simulatedQTL = NULL,
+  effective.n.tests = 600,
+  p1.name = NULL,
+  p2.name = NULL
+)
 }
 \arguments{
 \item{results}{data.frame of experiment results}
@@ -12,6 +18,10 @@ plotSummary(results, simulatedQTL = NULL, effective.n.tests = 600)
 \item{simulatedQTL}{data frame of chromosome, and position of simulated QTL (optional)}
 
 \item{effective.n.tests}{effective number of tests genomewide (integer)}
+
+\item{p1.name}{short name of parent 1 strain (displayed at y=1 on contrast panel)}
+
+\item{p2.name}{short name of parent 2 strain (displayed at y=-1 on contrast panel)}
 }
 \value{
 ggplot object of experiment results
