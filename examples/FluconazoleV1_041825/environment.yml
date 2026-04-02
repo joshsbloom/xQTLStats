@@ -1,0 +1,28 @@
+name: genomics
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # ── Pipeline tools ──
+  - nextflow
+  - bwa
+  - gatk4
+  - bcftools
+  - sambamba
+  # ── R packages (CRAN) ──
+  - r-tidyverse
+  - r-data.table
+  - r-qs
+  - r-qs2
+  - r-vcfr
+  - r-alphasimr
+  - r-rfast
+  - r-ggpubr
+  - r-patchwork
+  - r-devtools
+  - r-pbmcapply
+  # ── R packages (Bioconductor) ──
+  - bioconductor-genomicranges
+  - bioconductor-iranges
+  - bioconductor-s4vectors
