@@ -313,13 +313,15 @@ calcContrastStats=function(results, L='meta_high', R='meta_low'){
 
 ##' Plot individual experiment results
 ##'
-##' @param results data.frame of experiment results 
-##' @param suffix of experiment name 
+##' @param results data.frame of experiment results
+##' @param suffix of experiment name
 ##' @param simulatedQTL data frame of chromosome, and position of simulated QTL (optional)
-##' @return ggplot object of experiment results  
-##' @export 
+##' @param p1.name short name of parent 1 strain (displayed at y=1)
+##' @param p2.name short name of parent 2 strain (displayed at y=0)
+##' @return ggplot object of experiment results
+##' @export
 ##' @import ggplot2
-plotIndividualExperiment=function(results, suffix,simulatedQTL=NULL){   
+plotIndividualExperiment=function(results, suffix, simulatedQTL=NULL, p1.name=NULL, p2.name=NULL){
 #suffix='high1'
     p1=rlang::sym(paste0('p1_',suffix))
     p2=rlang::sym(paste0('p2_',suffix))
@@ -328,31 +330,53 @@ plotIndividualExperiment=function(results, suffix,simulatedQTL=NULL){
     expected=rlang::sym(paste0('expected.phased_', suffix))
     if(paste0('expected.phased_', suffix)  %in% colnames(results) ) {Switch=T} else {Switch=F}
 
+    # Compute y data range for parent labels (p1/(p1+p2) plus CI ribbons)
+    p1_vals = as.numeric(unlist(results[, paste0('p1_', suffix)]))
+    p2_vals = as.numeric(unlist(results[, paste0('p2_', suffix)]))
+    afd_vals = as.numeric(unlist(results[, paste0('afd_', suffix)]))
+    afd_se_vals = as.numeric(unlist(results[, paste0('afd.se_', suffix)]))
+    y_raw = p1_vals / (p1_vals + p2_vals)
+    y_all = c(y_raw, afd_vals - 1.96 * afd_se_vals, afd_vals + 1.96 * afd_se_vals)
+    y_range = range(y_all, na.rm = TRUE)
 
-  ggplot(results, aes(x=physical.position,y={{p1}}/({{p1}}+{{p2}})))+    
+    # Build secondary axis with parent labels at rendered extremes
+    has_parents = !is.null(p1.name) || !is.null(p2.name)
+    if (has_parents) {
+        sec_breaks = y_range
+        sec_labels = c(
+            if (!is.null(p2.name)) p2.name else "",
+            if (!is.null(p1.name)) p1.name else ""
+        )
+        y_sec = sec_axis(~., breaks = sec_breaks, labels = sec_labels)
+    }
+
+  ggplot(results, aes(x=physical.position,y={{p1}}/({{p1}}+{{p2}})))+
     geom_point(size=0.3,alpha=0.6, color='gray21')+
     {if(!is.null(simulatedQTL))
         geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')}+
     facet_grid(~chrom, scales='free_x', space='free_x') +
-    geom_ribbon(aes(ymin={{afd}}-1.96*{{afd.se}}, ymax={{afd}}+1.96*{{afd.se}}, fill='grey'), 
+    geom_ribbon(aes(ymin={{afd}}-1.96*{{afd.se}}, ymax={{afd}}+1.96*{{afd.se}}, fill='grey'),
                 alpha=0.7,linetype='dashed', color='grey')+
     geom_line(aes(x=physical.position, y={{afd}}),color='red', size=2, alpha=1)+
-    {if(Switch) 
+    {if(Switch)
     geom_line(aes(x=physical.position, y={{expected}}),color='black', size=.5)}+
+    {if(has_parents) scale_y_continuous(name = "AF", sec.axis = y_sec) else scale_y_continuous(name = "AF")}+
     theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position='none')+ggtitle(suffix)
 
 }
 
 ##' Plot contrast of experiment 1 - experiment 2
 ##'
-##' @param results data.frame of experiment results 
-##' @param suffix1 of experiment 1 name  
-##' @param suffix2 of experiment 2 name 
+##' @param results data.frame of experiment results
+##' @param suffix1 of experiment 1 name
+##' @param suffix2 of experiment 2 name
 ##' @param simulatedQTL data frame of chromosome, and position of simulated QTL (optional)
-##' @return ggplot object of experiment results  
-##' @export 
+##' @param p1.name short name of parent 1 strain (displayed at y-axis max)
+##' @param p2.name short name of parent 2 strain (displayed at y-axis min)
+##' @return ggplot object of experiment results
+##' @export
 ##' @import ggplot2
-plotContrast=function(results, suffix1, suffix2, simulatedQTL=NULL) {
+plotContrast=function(results, suffix1, suffix2, simulatedQTL=NULL, p1.name=NULL, p2.name=NULL) {
     Lp1=rlang::sym(paste0('p1_',suffix1))
     Lp2=rlang::sym(paste0('p2_',suffix1))
     Lafd=rlang::sym(paste0('afd_', suffix1))
@@ -367,17 +391,43 @@ plotContrast=function(results, suffix1, suffix2, simulatedQTL=NULL) {
     Rexpected=rlang::sym(paste0('expected.phased_', suffix2))
     if(paste0('expected.phased_', suffix2)  %in% colnames(results) ) {SwitchL=T} else {SwitchL=F}
 
+    # Compute y data range for parent labels
+    Lp1_vals = as.numeric(unlist(results[, paste0('p1_', suffix1)]))
+    Lp2_vals = as.numeric(unlist(results[, paste0('p2_', suffix1)]))
+    Rp1_vals = as.numeric(unlist(results[, paste0('p1_', suffix2)]))
+    Rp2_vals = as.numeric(unlist(results[, paste0('p2_', suffix2)]))
+    Lafd_vals = as.numeric(unlist(results[, paste0('afd_', suffix1)]))
+    Rafd_vals = as.numeric(unlist(results[, paste0('afd_', suffix2)]))
+    Lafd_se_vals = as.numeric(unlist(results[, paste0('afd.se_', suffix1)]))
+    Rafd_se_vals = as.numeric(unlist(results[, paste0('afd.se_', suffix2)]))
+    y_raw = (Lp1_vals / (Lp1_vals + Lp2_vals)) - (Rp1_vals / (Rp1_vals + Rp2_vals))
+    contrast_se = sqrt(Lafd_se_vals^2 + Rafd_se_vals^2)
+    y_all = c(y_raw, (Lafd_vals - Rafd_vals) - 1.96 * contrast_se, (Lafd_vals - Rafd_vals) + 1.96 * contrast_se)
+    y_range = range(y_all, na.rm = TRUE)
+
+    # Build secondary axis with parent labels at rendered extremes
+    has_parents = !is.null(p1.name) || !is.null(p2.name)
+    if (has_parents) {
+        sec_breaks = y_range
+        sec_labels = c(
+            if (!is.null(p2.name)) p2.name else "",
+            if (!is.null(p1.name)) p1.name else ""
+        )
+        y_sec = sec_axis(~., breaks = sec_breaks, labels = sec_labels)
+    }
+
     ggplot(results, aes(x=physical.position,y=({{Lp1}}/({{Lp1}}+{{Lp2}}))-({{Rp1}}/({{Rp1}}+{{Rp2}}))))+
     geom_point(size=0.3,alpha=0.6, color='gray21')+
     {if(!is.null(simulatedQTL))
         geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')}+
     facet_grid(~chrom, scales='free_x', space='free_x')+
     geom_ribbon(aes(ymin=({{Lafd}}-{{Rafd}})-1.96*sqrt( {{Lafd.se}}^2+{{Rafd.se}}^2),
-                    ymax=({{Lafd}}-{{Rafd}})+1.96*sqrt( {{Lafd.se}}^2+{{Rafd.se}}^2), fill='grey'), 
+                    ymax=({{Lafd}}-{{Rafd}})+1.96*sqrt( {{Lafd.se}}^2+{{Rafd.se}}^2), fill='grey'),
                      alpha=0.7,linetype='dashed', color='grey')+
-    geom_line(aes(x=physical.position, y={{Lafd}}-{{Rafd}}),color='red', size=2, alpha=1)+ 
+    geom_line(aes(x=physical.position, y={{Lafd}}-{{Rafd}}),color='red', size=2, alpha=1)+
     {if(SwitchL)
     geom_line(aes(x=physical.position, y={{Lexpected}}-{{Rexpected}}),color='black', size=.5)}+
+    {if(has_parents) scale_y_continuous(name = "AFD", sec.axis = y_sec) else scale_y_continuous(name = "AFD")}+
     theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position='none')+
     ggtitle(paste(suffix1, '-', suffix2))
 
@@ -385,35 +435,283 @@ plotContrast=function(results, suffix1, suffix2, simulatedQTL=NULL) {
 
 ##' Plot summary contrast and standard error, as well as -log10(p)
 ##'
-##' @param results data.frame of experiment results 
+##' @param results data.frame of experiment results
 ##' @param simulatedQTL data frame of chromosome, and position of simulated QTL (optional)
 ##' @param effective.n.tests effective number of tests genomewide (integer)
-##' @return ggplot object of experiment results  
-##' @export 
+##' @param p1.name short name of parent 1 strain (displayed at y=1 on contrast panel)
+##' @param p2.name short name of parent 2 strain (displayed at y=-1 on contrast panel)
+##' @return ggplot object of experiment results
+##' @export
 ##' @import ggplot2
-plotSummary=function(results, simulatedQTL=NULL, effective.n.tests=600){   
-    #suffix='high1'
+plotSummary=function(results, simulatedQTL=NULL, effective.n.tests=600, p1.name=NULL, p2.name=NULL){
 
-    Z=ggplot(results, aes(x=physical.position,y=contrast.beta))+    
-        #geom_line(size=0.3,alpha=0.6, color='gray21')+
-        geom_line(color='black', size=.5)+ 
+    # Compute y data range for parent labels
+    beta = results$contrast.beta
+    beta_se = results$contrast.beta.se
+    y_all = c(beta, beta - 1.96 * beta_se, beta + 1.96 * beta_se)
+    y_range = range(y_all, na.rm = TRUE)
+
+    # Build secondary axis with parent labels at rendered extremes
+    has_parents = !is.null(p1.name) || !is.null(p2.name)
+    if (has_parents) {
+        sec_breaks = y_range
+        sec_labels = c(
+            if (!is.null(p2.name)) p2.name else "",
+            if (!is.null(p1.name)) p1.name else ""
+        )
+        y_sec = sec_axis(~., breaks = sec_breaks, labels = sec_labels)
+    }
+
+    Z=ggplot(results, aes(x=physical.position,y=contrast.beta))+
+        geom_line(color='black', size=.5)+
         {if(!is.null(simulatedQTL))
         geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')}+
         facet_grid(~chrom, scales='free_x', space='free_x') +
-        geom_ribbon(aes(ymin=contrast.beta-1.96*contrast.beta.se, ymax=contrast.beta+1.96*contrast.beta.se, fill='grey'), 
+        geom_ribbon(aes(ymin=contrast.beta-1.96*contrast.beta.se, ymax=contrast.beta+1.96*contrast.beta.se, fill='grey'),
                     alpha=0.7,linetype='dashed', color='grey')+
-        #geom_line(aes(x=physical.position, y={{afd}}),color='red', size=2, alpha=1)+
-        #{if(Switch) 
-        #geom_line(aes(x=physical.position, y={{expected}}),color='black', size=.5)}+
+        {if(has_parents) scale_y_continuous(name = "AFD", sec.axis = y_sec) else scale_y_continuous(name = "AFD")}+
         theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1), legend.position='none')+ggtitle('contrast.beta')
-     nlp=ggplot(results, aes(x=physical.position, y=-log10(p)))+geom_line(color='black', size=1.5)+ 
+     nlp=ggplot(results, aes(x=physical.position, y=-log10(p)))+geom_line(color='black', size=1.5)+
           {if(!is.null(simulatedQTL))
             geom_vline(data=simulatedQTL, aes(xintercept=physical.position), color='blue')}+
             facet_grid(~chrom, scales='free_x', space='free_x')+
             geom_hline(aes(yintercept=-log10(.05/effective.n.tests)), color='red')+
             theme_bw()+theme(axis.text.x = element_text(angle = 45, hjust=1))+ggtitle('-log10(p)')
 
-     ggpubr::ggarrange(Z,nlp, nrow=2) 
+     ggpubr::ggarrange(Z,nlp, nrow=2)
 }
 
+#' Plot signed -log10(p) with shaded backgrounds
+#'
+#' Plots contrast significance as sign(contrast.beta) * -log10(p) per chromosome,
+#' with positive values (mistyrose background) and negative values (lightblue background)
+#' indicating the direction of the allele frequency shift. Bonferroni-corrected
+#' significance thresholds are drawn as horizontal red lines.
+#'
+#' @param results data.frame with columns: physical.position, contrast.beta, p, chrom (and LOD if use.LOD=TRUE)
+#' @param simulatedQTL data.frame with columns: physical.position, chrom for simulated QTL positions (optional)
+#' @param effective.n.tests effective number of independent tests genomewide for Bonferroni correction (default 600)
+#' @param p1.name short name of parent 1 strain (displayed at y-axis max)
+#' @param p2.name short name of parent 2 strain (displayed at y-axis min)
+#' @param use.LOD if TRUE, plot signed LOD instead of signed -log10(p) (default FALSE)
+#' @return ggplot object
+#' @export
+#' @import ggplot2
+plotSummarySignedShade <- function(results, simulatedQTL = NULL, effective.n.tests = 600, p1.name = NULL, p2.name = NULL, use.LOD = FALSE) {
+
+    if (use.LOD) {
+        results$signed_y <- sign(results$contrast.beta) * results$LOD
+        y_label = "signed LOD"
+        threshold = PvalToLOD(0.05 / effective.n.tests)
+    } else {
+        results$signed_y <- sign(results$contrast.beta) * -log10(results$p)
+        y_label = "signed -log10(p)"
+        threshold = -log10(0.05 / effective.n.tests)
+    }
+
+    # Compute y data range for parent labels
+    y_range = range(results$signed_y, na.rm = TRUE)
+    has_parents = !is.null(p1.name) || !is.null(p2.name)
+    if (has_parents) {
+        sec_breaks = y_range
+        sec_labels = c(
+            if (!is.null(p2.name)) p2.name else "",
+            if (!is.null(p1.name)) p1.name else ""
+        )
+        y_sec = sec_axis(~., breaks = sec_breaks, labels = sec_labels)
+    }
+
+    ggplot(results, aes(x = physical.position, y = signed_y)) +
+        annotate("rect",
+                 xmin = -Inf, xmax = Inf,
+                 ymin = 0, ymax = Inf,
+                 fill = "mistyrose", alpha = 0.3) +
+        annotate("rect",
+                 xmin = -Inf, xmax = Inf,
+                 ymin = -Inf, ymax = 0,
+                 fill = "lightblue", alpha = 0.3) +
+        geom_line(size = 1, color = "black") +
+        {
+            if (!is.null(simulatedQTL))
+                geom_vline(data = simulatedQTL,
+                           aes(xintercept = physical.position),
+                           color = "blue")
+        } +
+        facet_grid(~chrom, scales = "free_x", space = "free_x") +
+        geom_hline(yintercept = 0, color = "grey40", linetype = "dashed") +
+        geom_hline(yintercept =  threshold, color = "red") +
+        geom_hline(yintercept = -threshold, color = "red") +
+        {if(has_parents) scale_y_continuous(name = y_label, sec.axis = y_sec) else scale_y_continuous(name = y_label)}+
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+        labs(
+            title = paste(y_label, "with Shaded Backgrounds"),
+            x = "Position"
+        )
+}
+
+#' Find QTL peaks and confidence intervals from contrast statistics
+#'
+#' Identifies QTL peaks that exceed a minimum LOD threshold and defines
+#' confidence intervals using a LOD drop method. Returns a GRanges object
+#' with peak position, LOD score, effect direction, and parent strain
+#' annotations per interval.
+#'
+#' @param results data.frame output of calcContrastStats with columns:
+#'   chrom, physical.position, LOD, contrast.beta
+#' @param LOD.threshold minimum LOD score for a peak to be called (default 4)
+#' @param LOD.drop LOD units below the peak to define the confidence interval (default 2)
+#' @param p1.name short name of parent 1 strain (positive contrast.beta direction)
+#' @param p2.name short name of parent 2 strain (negative contrast.beta direction)
+#' @return GRanges object with metadata columns: peak.pos, peak.LOD, peak.beta,
+#'   direction (sign of contrast.beta at peak), high.parent (strain name favored at peak),
+#'   low.parent (strain name disfavored at peak)
+#' @export
+findQTLPeaks <- function(results, LOD.threshold = 4, LOD.drop = 2,
+                          p1.name = "p1", p2.name = "p2") {
+
+    if (!requireNamespace("GenomicRanges", quietly = TRUE) ||
+        !requireNamespace("IRanges", quietly = TRUE)) {
+        stop("GenomicRanges and IRanges packages are required. ",
+             "Install with: BiocManager::install(c('GenomicRanges', 'IRanges'))")
+    }
+
+    chroms = unique(results$chrom)
+    peak_list = list()
+
+    for (chr in chroms) {
+        idx = which(results$chrom == chr)
+        pos = results$physical.position[idx]
+        lod = results$LOD[idx]
+        beta = results$contrast.beta[idx]
+        n = length(lod)
+        if (n < 3) next
+
+        # Order by position within chromosome
+        ord = order(pos)
+        pos = pos[ord]
+        lod = lod[ord]
+        beta = beta[ord]
+
+        # Replace NA/NaN LOD with 0 so comparisons work cleanly
+        lod[is.na(lod)] = 0
+
+        # Find local maxima above threshold
+        # A local maximum: LOD[i] > LOD[i-1] and LOD[i] >= LOD[i+1]
+        is_peak = rep(FALSE, n)
+        for (i in 2:(n - 1)) {
+            if (lod[i] >= LOD.threshold &&
+                lod[i] > lod[i - 1] &&
+                lod[i] >= lod[i + 1]) {
+                is_peak[i] = TRUE
+            }
+        }
+        # Check endpoints
+        if (n >= 2 && lod[1] >= LOD.threshold && lod[1] >= lod[2]) is_peak[1] = TRUE
+        if (n >= 2 && lod[n] >= LOD.threshold && lod[n] > lod[n - 1]) is_peak[n] = TRUE
+
+        peak_idx = which(is_peak)
+        if (length(peak_idx) == 0) next
+
+        # Merge peaks that share overlapping LOD drop intervals
+        # First pass: compute raw intervals
+        raw_intervals = data.frame(
+            peak_i = peak_idx,
+            peak_pos = pos[peak_idx],
+            peak_lod = lod[peak_idx],
+            peak_beta = beta[peak_idx],
+            left = NA_real_,
+            right = NA_real_
+        )
+
+        for (j in seq_len(nrow(raw_intervals))) {
+            pi = raw_intervals$peak_i[j]
+            drop_level = lod[pi] - LOD.drop
+
+            # Walk left
+            li = pi
+            while (li > 1 && lod[li - 1] >= drop_level) li = li - 1
+            raw_intervals$left[j] = pos[li]
+
+            # Walk right
+            ri = pi
+            while (ri < n && lod[ri + 1] >= drop_level) ri = ri + 1
+            raw_intervals$right[j] = pos[ri]
+        }
+
+        # Merge overlapping intervals, keeping the highest peak
+        raw_intervals = raw_intervals[order(raw_intervals$left), ]
+        merged = list()
+        current = raw_intervals[1, ]
+        if (nrow(raw_intervals) > 1) {
+            for (j in 2:nrow(raw_intervals)) {
+                if (raw_intervals$left[j] <= current$right) {
+                    # Overlapping — extend right boundary, keep higher peak
+                    current$right = max(current$right, raw_intervals$right[j])
+                    if (raw_intervals$peak_lod[j] > current$peak_lod) {
+                        current$peak_i = raw_intervals$peak_i[j]
+                        current$peak_pos = raw_intervals$peak_pos[j]
+                        current$peak_lod = raw_intervals$peak_lod[j]
+                        current$peak_beta = raw_intervals$peak_beta[j]
+                    }
+                } else {
+                    merged[[length(merged) + 1]] = current
+                    current = raw_intervals[j, ]
+                }
+            }
+        }
+        merged[[length(merged) + 1]] = current
+        merged = do.call(rbind, merged)
+
+        # Recompute interval boundaries from the winning peak after merge
+        for (j in seq_len(nrow(merged))) {
+            pi = merged$peak_i[j]
+            drop_level = lod[pi] - LOD.drop
+
+            li = pi
+            while (li > 1 && lod[li - 1] >= drop_level) li = li - 1
+            merged$left[j] = pos[li]
+
+            ri = pi
+            while (ri < n && lod[ri + 1] >= drop_level) ri = ri + 1
+            merged$right[j] = pos[ri]
+        }
+
+        merged$chrom = chr
+        peak_list[[chr]] = merged
+    }
+
+    if (length(peak_list) == 0) {
+        gr = GenomicRanges::GRanges()
+        GenomicRanges::mcols(gr) = data.frame(
+            peak.pos = integer(0),
+            peak.LOD = numeric(0),
+            peak.beta = numeric(0),
+            direction = integer(0),
+            high.parent = character(0),
+            low.parent = character(0),
+            stringsAsFactors = FALSE
+        )
+        return(gr)
+    }
+
+    all_peaks = do.call(rbind, peak_list)
+    direction = sign(all_peaks$peak_beta)
+    high.parent = ifelse(direction > 0, p1.name, p2.name)
+    low.parent = ifelse(direction > 0, p2.name, p1.name)
+
+    gr = GenomicRanges::GRanges(
+        seqnames = all_peaks$chrom,
+        ranges = IRanges::IRanges(start = all_peaks$left, end = all_peaks$right),
+        peak.pos = all_peaks$peak_pos,
+        peak.LOD = all_peaks$peak_lod,
+        peak.beta = all_peaks$peak_beta,
+        direction = direction,
+        high.parent = high.parent,
+        low.parent = low.parent
+    )
+
+    gr = sort(gr)
+    return(gr)
+}
 
